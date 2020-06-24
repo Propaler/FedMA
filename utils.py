@@ -123,11 +123,11 @@ def partition_data(dataset, datadir, logdir, partition, n_nets, alpha, args):
         X_train, y_train, X_test, y_test = load_mnist_data(datadir)
         n_train = X_train.shape[0]
 
-    if datset == 'nih':
+    if dataset == 'nih':
         data_from_csv = {}
         net_dataidx_map = {}
         csv_path = args.csv_path
-        images_path = args.csv_path
+        images_path = args.img_path
 
         init_position = 0
         for idx in range(n_nets):
@@ -158,10 +158,11 @@ def partition_data(dataset, datadir, logdir, partition, n_nets, alpha, args):
     if dataset == 'hpe-mnist':
         # testing
 
+
         data_from_csv = {}
         net_dataidx_map = {}
         csv_path = args.csv_path
-        images_path = args.csv_path
+        images_path = args.img_path
 
         init_position = 0
         for idx in range(n_nets):

@@ -44,7 +44,7 @@ def add_fit_args(parser):
     parser.add_argument('--model', type=str, default='lenet', metavar='N',
                         help='neural network used in training')
     parser.add_argument('--csv_path',type=str, default=None)
-    parser.add_argument('--images_path',type-str,dafault=None)
+    parser.add_argument('--img_path',type=str,default=None)
     parser.add_argument('--img_dim',type=int, default=28, help='image dimension for the dataset')
     parser.add_argument('--mu',type=float, default=0, help='mu value to fedprox experiment')
     parser.add_argument('--dataset', type=str, default='cifar10', metavar='N',
