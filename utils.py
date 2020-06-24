@@ -29,9 +29,18 @@ from combine_nets import prepare_uniform_weights, prepare_sanity_weights, prepar
 from vgg import *
 from model import *
 
+from hpe import dataset
+from hpe.mnist import DataLoaderMNIST
+from hpe.nih import DataLoaderNIH
+
 logging.basicConfig()
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+datasets = {
+    "mnist": DataLoaderMNIST,
+    "nih": DataLoaderNIH,
+}
 
 def mkdirs(dirpath):
     try:
@@ -51,6 +60,52 @@ def parse_class_dist(net_class_config):
 
     return cls_net_map
 
+def build_both_train_test_from_csv(
+    dataset_name,
+    csv_file_train,
+    csv_file_test,
+    path_to_images,
+    output_dir=None,
+    batch_size_train=64,
+    batch_size_test=128,
+    img_dim=32,
+    **kwargs,
+):
+
+    if dataset_name in datasets:
+        train_from_csv = dataset.Dataset(
+            batch_size=batch_size_train,
+            output_dir=output_dir,
+            dataset_name=dataset_name,
+            csv_file=csv_file_train,
+            path_to_images=path_to_images,
+            img_dim=img_dim,
+            dataloader=datasets[dataset_name],
+            **kwargs,
+        )
+
+        test_from_csv = dataset.Dataset(
+            batch_size=batch_size_test,
+            output_dir=output_dir,
+            dataset_name=dataset_name,
+            csv_file=csv_file_test,
+            path_to_images=path_to_images,
+            img_dim=img_dim,
+            dataloader=datasets[dataset_name],
+            **kwargs,
+        )
+
+    elif dataset_name not in datasets:
+        raise ValueError("Unkown dataset {}".format(dataset_name))
+
+    train_loader = train_from_csv.make_trainset()
+
+    test_loader = test_from_csv.make_testset()
+
+    return train_loader, test_loader
+
+    # return train_from_csv, test_from_csv
+
 def record_net_data_stats(y_train, net_dataidx_map, logdir):
 
     net_cls_counts = {}
@@ -67,6 +122,78 @@ def partition_data(dataset, datadir, logdir, partition, n_nets, alpha, args):
     if dataset == 'mnist':
         X_train, y_train, X_test, y_test = load_mnist_data(datadir)
         n_train = X_train.shape[0]
+
+    if datset == 'nih':
+        data_from_csv = {}
+        net_dataidx_map = {}
+        csv_path = args.csv_path
+        images_path = args.csv_path
+
+        init_position = 0
+        for idx in range(n_nets):
+            data_from_csv[idx] = build_both_train_test_from_csv(
+                "nih",
+                csv_path + "worker_" + str(idx +1)  + "/train.csv",
+                csv_path + "worker_"  + str(idx + 1)  + "/test.csv",
+                images_path,
+                img_dim=args.img_dim
+            )
+            
+            len_data_idx = len(data_from_csv[idx][0])
+            net_dataidx_map[idx] = np.arange(init_position, len_data_idx + init_position)
+            init_position = len_data_idx + 1
+
+
+        all_train_dataset = torch.utils.data.ConcatDataset([dataset[0] for dataset in data_from_csv.values()])
+        all_test_dataset = torch.utils.data.ConcatDataset([dataset[1] for dataset in data_from_csv.values()])
+
+        dataloader = torch.utils.data.DataLoader(all_train_dataset, shuffle=False)
+        iter_dataloader = iter(dataloader)
+        y_train = [target for (data, target) in iter_dataloader]
+        y_train = np.array(y_train)
+
+        traindata_cls_counts = record_net_data_stats(y_train, net_dataidx_map, logdir)
+
+        return y_train, net_dataidx_map, traindata_cls_counts, all_train_dataset, all_test_dataset  
+    if dataset == 'hpe-mnist':
+        # testing
+
+        data_from_csv = {}
+        net_dataidx_map = {}
+        csv_path = args.csv_path
+        images_path = args.csv_path
+
+        init_position = 0
+        for idx in range(n_nets):
+            data_from_csv[idx] = build_both_train_test_from_csv(
+                "mnist",
+                csv_path + "worker_" + str(idx +1)  + "/train.csv",
+                csv_path + "worker_"  + str(idx + 1)  + "/test.csv",
+                images_path,
+                img_dim=args.img_dim
+            )
+            
+            len_data_idx = len(data_from_csv[idx][0])
+            net_dataidx_map[idx] = np.arange(init_position, len_data_idx + init_position)
+            init_position = len_data_idx + 1
+
+
+        all_train_dataset = torch.utils.data.ConcatDataset([dataset[0] for dataset in data_from_csv.values()])
+        all_test_dataset = torch.utils.data.ConcatDataset([dataset[1] for dataset in data_from_csv.values()])
+
+        dataloader = torch.utils.data.DataLoader(all_train_dataset, shuffle=False)
+        iter_dataloader = iter(dataloader)
+        y_train = [target for (data, target) in iter_dataloader]
+        y_train = np.array(y_train)
+
+        traindata_cls_counts = record_net_data_stats(y_train, net_dataidx_map, logdir)
+
+        return y_train, net_dataidx_map, traindata_cls_counts, all_train_dataset, all_test_dataset
+
+
+    if dataset == 'nih':
+        raise NotImplementedError
+
     elif dataset == 'cifar10':
         X_train, y_train, X_test, y_test = load_cifar10_data(datadir)
         n_train = X_train.shape[0]
@@ -922,7 +1049,7 @@ def init_models(net_configs, n_nets, args):
             elif args.dataset == "mnist":
                 cnn = SimpleCNNMNIST(input_dim=(16 * 4 * 4), hidden_dims=[120, 84], output_dim=10)
         elif args.model == "moderate-cnn":
-            if args.dataset == "mnist":
+            if args.dataset == "mnist" or args.dataset == "hpe-mnist":
                 cnn = ModerateCNNMNIST()
             elif args.dataset in ("cifar10", "cinic10"):
                 cnn = ModerateCNN()
@@ -978,7 +1105,14 @@ def load_model_viz(model, model_index, device="cpu"):
     return model
 
 
-def get_dataloader(dataset, datadir, train_bs, test_bs, dataidxs=None):
+def get_dataloader(dataset, datadir, train_bs, test_bs, dataidxs=None, all_train_dataset=None, all_test_dataset=None):
+
+    if dataset == 'hpe-mnist':
+        # shuffle false 
+        train_dl = data.DataLoader(dataset=all_train_dataset, batch_size=train_bs, shuffle=False)
+        test_dl = data.DataLoader(dataset=all_test_dataset, batch_size=test_bs, shuffle=False)
+            
+        return train_dl, test_dl
 
     if dataset in ('mnist', 'cifar10'):
         if dataset == 'mnist':

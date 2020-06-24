@@ -1,0 +1,3 @@
+class DEFAULT_COLUMN:
+    DEFAULT_LABEL_COLUMN = "label"
+    DEFAULT_ID_COLUMN = "id"
