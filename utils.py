@@ -154,7 +154,7 @@ def partition_data(dataset, datadir, logdir, partition, n_nets, alpha, args):
 
         traindata_cls_counts = record_net_data_stats(y_train, net_dataidx_map, logdir)
 
-        return y_train, net_dataidx_map, traindata_cls_counts, all_train_dataset, all_test_dataset  
+        return y_train, net_dataidx_map, traindata_cls_counts  
     if dataset == 'hpe-mnist':
         # testing
 
@@ -1106,10 +1106,30 @@ def load_model_viz(model, model_index, device="cpu"):
     return model
 
 
-def get_dataloader(dataset, datadir, train_bs, test_bs, dataidxs=None, all_train_dataset=None, all_test_dataset=None):
+def get_dataloader(dataset, datadir, train_bs, test_bs, dataidxs=None, args = None):
 
     if dataset == 'hpe-mnist':
-        # shuffle false 
+        # shuffle false
+        data_from_csv = {}
+        csv_path = args.csv_path
+        images_path = args.img_path
+
+        init_position = 0
+        for idx in range(n_nets):
+            data_from_csv[idx] = build_both_train_test_from_csv(
+                "mnist",
+                csv_path + "worker_" + str(idx +1)  + "/train.csv",
+                csv_path + "worker_"  + str(idx + 1)  + "/test.csv",
+                images_path,
+                img_dim=args.img_dim
+            )
+            
+            len_data_idx = len(data_from_csv[idx][0])
+
+        all_train_dataset = torch.utils.data.ConcatDataset([dataset[0] for dataset in data_from_csv.values()])
+        all_test_dataset = torch.utils.data.ConcatDataset([dataset[1] for dataset in data_from_csv.values()])
+
+
         train_dl = data.DataLoader(dataset=all_train_dataset, batch_size=train_bs, shuffle=False)
         test_dl = data.DataLoader(dataset=all_test_dataset, batch_size=test_bs, shuffle=False)
             

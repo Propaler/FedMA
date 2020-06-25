@@ -152,7 +152,7 @@ def train_net(net_id, net, train_dataloader, test_dataloader, epochs, lr, args, 
     return train_acc, test_acc
 
 
-def local_train(nets, args, net_dataidx_map, device="cpu", all_train_dataset=None, all_test_dataset=None):
+def local_train(nets, args, net_dataidx_map, device="cpu"):
     # save local dataset
     local_datasets = []
     for net_id, net in nets.items():
@@ -162,12 +162,9 @@ def local_train(nets, args, net_dataidx_map, device="cpu", all_train_dataset=Non
             # move the model to cuda device:
             net.to(device)
 
-            if args.dataset == 'hpe-mnist' or arg.datset =='nih':
-                train_dl_local, test_dl_local = get_dataloader(args.dataset, args_datadir, args.batch_size, 32, dataidxs, all_train_dataset=all_train_dataset, all_test_dataset=all_test_dataset)
-                train_dl_global, test_dl_global = get_dataloader(args.dataset, args_datadir, args.batch_size, 32,all_train_dataset=all_train_dataset, all_test_dataset=all_test_dataset)
-            else:
-                train_dl_local, test_dl_local = get_dataloader(args.dataset, args_datadir, args.batch_size, 32, dataidxs)
-                train_dl_global, test_dl_global = get_dataloader(args.dataset, args_datadir, args.batch_size, 32)
+
+            train_dl_local, test_dl_local = get_dataloader(args.dataset, args_datadir, args.batch_size, 32, dataidxs, args=args)
+            train_dl_global, test_dl_global = get_dataloader(args.dataset, args_datadir, args.batch_size, 32, args=args)
 
             local_datasets.append((train_dl_local, test_dl_local))
 
@@ -1191,7 +1188,7 @@ def oneshot_matching(nets_list, model_meta_data, layer_type, net_dataidx_map,
         retrained_nets = []
         for worker_index in range(num_workers):
             dataidxs = net_dataidx_map[worker_index]
-            train_dl_local, test_dl_local = get_dataloader(args.dataset, args_datadir, args.batch_size, 32, dataidxs)
+            train_dl_local, test_dl_local = get_dataloader(args.dataset, args_datadir, args.batch_size, 32, dataidxs, args=args)
             logger.info("Re-training on local worker: {}, starting from layer: {}".format(worker_index, 2 * (layer_index + 1) - 2))
             retrained_cnn = local_retrain_dummy((train_dl_local,test_dl_local), tempt_weights[worker_index], args, 
                                             freezing_index=(2 * (layer_index + 1) - 2), device=device)
@@ -1333,7 +1330,7 @@ def BBP_MAP(nets_list, model_meta_data, layer_type, net_dataidx_map,
         retrained_nets = []
         for worker_index in range(num_workers):
             dataidxs = net_dataidx_map[worker_index]
-            train_dl_local, test_dl_local = get_dataloader(args.dataset, args_datadir, args.batch_size, 32, dataidxs)
+            train_dl_local, test_dl_local = get_dataloader(args.dataset, args_datadir, args.batch_size, 32, dataidxs, args=args)
 
             logger.info("Re-training on local worker: {}, starting from layer: {}".format(worker_index, 2 * (layer_index + 1) - 2))
             retrained_cnn = local_retrain((train_dl_local,test_dl_local), tempt_weights[worker_index], args, 
@@ -1395,7 +1392,7 @@ def fedavg_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
         logger.info("Communication round : {}".format(cr))
         for worker_index in range(args.n_nets):
             dataidxs = net_dataidx_map[worker_index]
-            train_dl_local, test_dl_local = get_dataloader(args.dataset, args_datadir, args.batch_size, 32, dataidxs)
+            train_dl_local, test_dl_local = get_dataloader(args.dataset, args_datadir, args.batch_size, 32, dataidxs,args=args)
             
             # def local_retrain_fedavg(local_datasets, weights, args, device="cpu"):
             retrained_cnn = local_retrain_fedavg((train_dl_local,test_dl_local), batch_weights[worker_index], args, device=device)
@@ -1437,7 +1434,7 @@ def fedprox_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
         logger.info("Communication round : {}".format(cr))
         for worker_index in range(args.n_nets):
             dataidxs = net_dataidx_map[worker_index]
-            train_dl_local, test_dl_local = get_dataloader(args.dataset, args_datadir, args.batch_size, 32, dataidxs)
+            train_dl_local, test_dl_local = get_dataloader(args.dataset, args_datadir, args.batch_size, 32, dataidxs, args=args)
             
             # def local_retrain_fedavg(local_datasets, weights, args, device="cpu"):
             # local_retrain_fedprox(local_datasets, weights, mu, args, device="cpu")
@@ -1497,7 +1494,7 @@ def fedma_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
         retrained_nets = []
         for worker_index in range(args.n_nets):
             dataidxs = net_dataidx_map[worker_index]
-            train_dl_local, test_dl_local = get_dataloader(args.dataset, args_datadir, args.batch_size, 32, dataidxs)
+            train_dl_local, test_dl_local = get_dataloader(args.dataset, args_datadir, args.batch_size, 32, dataidxs, args=args)
 
             # for the "squeezing" mode, we pass assignment list wrt this worker to the `local_retrain` function
             recons_local_net = reconstruct_local_net(batch_weights[worker_index], args, ori_assignments=assignments_list, worker_index=worker_index)
@@ -1536,12 +1533,8 @@ if __name__ == "__main__":
     logger.info("Partitioning data")
 
     if args.partition != "hetero-fbs":
-        if args.dataset == 'hpe-mnist':
-            y_train, net_dataidx_map, traindata_cls_counts, all_train_dataset, all_test_dataset = partition_data(args.dataset, args_datadir, args_logdir, 
-                                                                args.partition, args.n_nets, args_alpha, args=args)
-        else:
-            y_train, net_dataidx_map, traindata_cls_counts = partition_data(args.dataset, args_datadir, args_logdir, 
-                                                                args.partition, args.n_nets, args_alpha, args=args)
+        y_train, net_dataidx_map, traindata_cls_counts = partition_data(args.dataset, args_datadir, args_logdir, 
+                                                            args.partition, args.n_nets, args_alpha, args=args)
     else:
         y_train, net_dataidx_map, traindata_cls_counts, baseline_indices = partition_data(args.dataset, args_datadir, args_logdir, 
                                                     args.partition, args.n_nets, args_alpha, args=args)
@@ -1568,14 +1561,9 @@ if __name__ == "__main__":
     logger.info("Retrain? : {}".format(args.retrain))
 
     ### local training stage
-    if args.dataset == 'hpe-mnist':
-        nets_list = local_train(nets, args, net_dataidx_map, device=device, all_train_dataset = all_train_dataset, all_test_dataset = all_test_dataset)
-    else:
-        nets_list = local_train(nets, args, net_dataidx_map, device=device)
-    if args.dataset == 'hpe-mnist':
-        train_dl_global, test_dl_global = get_dataloader(args.dataset, args_datadir, args.batch_size,32, all_train_dataset=all_train_dataset, all_test_dataset=all_test_dataset)
-    else:
-        train_dl_global, test_dl_global = get_dataloader(args.dataset, args_datadir, args.batch_size, 32)
+
+    nets_list = local_train(nets, args, net_dataidx_map, device=device)
+    train_dl_global, test_dl_global = get_dataloader(args.dataset, args_datadir, args.batch_size, 32, args=args)
 
     # ensemble part of experiments
     logger.info("Computing Uniform ensemble accuracy")
