@@ -290,7 +290,7 @@ def local_retrain_dummy(local_datasets, weights, args, mode="bottom-up", freezin
                                                     input_dim=input_dim, 
                                                     hidden_dims=hidden_dims, 
                                                     output_dim=10)
-        elif args.dataset == "mnist":
+        elif args.dataset == "mnist" or args.dataset == 'hpe-mnist':
             matched_cnn = ModerateCNNContainer(1,
                                                 num_filters, 
                                                 kernel_size=3, 
@@ -521,7 +521,7 @@ def local_retrain(local_datasets, weights, args, mode="bottom-up", freezing_inde
                                                     input_dim=input_dim, 
                                                     hidden_dims=hidden_dims, 
                                                     output_dim=10)
-        elif args.dataset == "mnist":
+        elif args.dataset == "mnist" or args.dataset =='hpe-mnist':
             matched_cnn = ModerateCNNContainer(1,
                                                 num_filters, 
                                                 kernel_size=3, 
