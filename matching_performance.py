@@ -19,7 +19,7 @@ def compute_model_averaging_accuracy(models, weights, train_dl, test_dl, n_class
     elif args.model == "moderate-cnn":
         if args.dataset in ("cifar10", "cinic10"):
             avg_cnn = ModerateCNN()
-        elif args.dataset == "mnist":
+        elif args.dataset == "mnist" or args.dataset == 'hpe-mnist':
             avg_cnn = ModerateCNNMNIST()
     
     new_state_dict = {}
@@ -232,7 +232,7 @@ def compute_full_cnn_accuracy(models, weights, train_dl, test_dl, n_classes, dev
         # [(9, 75), (9,), (19, 225), (19,), (475, 123), (123,), (123, 87), (87,), (87, 10), (10,)]
         if args.dataset in ("cifar10", "cinic10"):
             input_channel = 3
-        elif args.dataset == "mnist":
+        elif args.dataset == "mnist" or args.dataset == 'hpe-mnist':
             input_channel = 1
         num_filters = [weights[0].shape[0], weights[2].shape[0]]
         input_dim = weights[4].shape[0]
