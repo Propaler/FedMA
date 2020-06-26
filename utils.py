@@ -155,10 +155,9 @@ def partition_data(dataset, datadir, logdir, partition, n_nets, alpha, args):
         traindata_cls_counts = record_net_data_stats(y_train, net_dataidx_map, logdir)
 
         return y_train, net_dataidx_map, traindata_cls_counts  
+
     if dataset == 'hpe-mnist':
         # testing
-
-
         data_from_csv = {}
         net_dataidx_map = {}
         csv_path = args.csv_path
