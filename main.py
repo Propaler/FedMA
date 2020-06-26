@@ -1409,7 +1409,7 @@ def fedavg_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
             avegerated_weight = sum([b[i] * fed_avg_freqs[j] for j, b in enumerate(batch_weights)])
             averaged_weights.append(avegerated_weight)
 
-        _ = compute_full_cnn_accuracy(None,
+        cnn_averaged = compute_full_cnn_accuracy(None,
                             averaged_weights,
                             train_dl_global,
                             test_dl_global,
@@ -1418,6 +1418,7 @@ def fedavg_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
                             args=args)
         batch_weights = [copy.deepcopy(averaged_weights) for _ in range(args.n_nets)]
         del averaged_weights
+        save_model(cnn_averaged,'final_avg_model')
 
 def fedprox_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
                             averaging_weights, args,
@@ -1452,7 +1453,7 @@ def fedprox_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
             avegerated_weight = sum([b[i] * fed_avg_freqs[j] for j, b in enumerate(batch_weights)])
             averaged_weights.append(avegerated_weight)
 
-        _ = compute_full_cnn_accuracy(None,
+        cnn_averaged = compute_full_cnn_accuracy(None,
                             averaged_weights,
                             train_dl_global,
                             test_dl_global,
@@ -1461,6 +1462,7 @@ def fedprox_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
                             args=args)
         batch_weights = [copy.deepcopy(averaged_weights) for _ in range(args.n_nets)]
         del averaged_weights
+        save_model(cnn_averaged,'final_avg_prox_model')
 
 
 def fedma_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map, 

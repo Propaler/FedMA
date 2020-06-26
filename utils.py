@@ -189,7 +189,7 @@ def partition_data(dataset, datadir, logdir, partition, n_nets, alpha, args):
 
         traindata_cls_counts = record_net_data_stats(y_train, net_dataidx_map, logdir)
 
-        return y_train, net_dataidx_map, traindata_cls_counts, all_train_dataset, all_test_dataset
+        return y_train, net_dataidx_map, traindata_cls_counts
 
 
     if dataset == 'nih':
@@ -1115,7 +1115,7 @@ def get_dataloader(dataset, datadir, train_bs, test_bs, dataidxs=None, args = No
         images_path = args.img_path
 
         init_position = 0
-        for idx in range(n_nets):
+        for idx in range(args.n_nets):
             data_from_csv[idx] = build_both_train_test_from_csv(
                 "mnist",
                 csv_path + "worker_" + str(idx +1)  + "/train.csv",

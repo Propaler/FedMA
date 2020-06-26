@@ -14,7 +14,7 @@ def compute_model_averaging_accuracy(models, weights, train_dl, test_dl, n_class
     elif args.model == "simple-cnn":
         if args.dataset in ("cifar10", "cinic10"):
             avg_cnn = SimpleCNN(input_dim=(16 * 5 * 5), hidden_dims=[120, 84], output_dim=10)
-        elif args.dataset == "mnist":
+        elif args.dataset == "mnist" or args.dataset == 'hpe-mnist':
             avg_cnn = SimpleCNNMNIST(input_dim=(16 * 4 * 4), hidden_dims=[120, 84], output_dim=10)
     elif args.model == "moderate-cnn":
         if args.dataset in ("cifar10", "cinic10"):
@@ -257,7 +257,7 @@ def compute_full_cnn_accuracy(models, weights, train_dl, test_dl, n_classes, dev
                                                 input_dim=input_dim, 
                                                 hidden_dims=hidden_dims, 
                                                 output_dim=10)
-        elif args.dataset == "mnist":
+        elif args.dataset == "mnist" or args.dataset == 'hpe-mnist':
             matched_cnn = ModerateCNNContainer(1,
                                                 num_filters, 
                                                 kernel_size=3, 
@@ -299,5 +299,7 @@ def compute_full_cnn_accuracy(models, weights, train_dl, test_dl, n_classes, dev
         _, pred_label = torch.max(out_k, 1)
         total += x.data.size()[0]
         correct += (pred_label == target.data).sum().item()
-        
+            
     logger.info("Accuracy for Neural Matching correct: {}, total: {}".format(correct, total))
+    
+    return matched_cnn
