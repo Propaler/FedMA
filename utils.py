@@ -1046,7 +1046,7 @@ def init_models(net_configs, n_nets, args):
         elif args.model == "simple-cnn":
             if args.dataset in ("cifar10", "cinic10"):
                 cnn = SimpleCNN(input_dim=(16 * 5 * 5), hidden_dims=[120, 84], output_dim=10)
-            elif args.dataset == "mnist":
+            elif args.dataset == "mnist" or args.dataset == 'hpe-mnist':
                 cnn = SimpleCNNMNIST(input_dim=(16 * 4 * 4), hidden_dims=[120, 84], output_dim=10)
         elif args.model == "moderate-cnn":
             if args.dataset == "mnist" or args.dataset == "hpe-mnist":

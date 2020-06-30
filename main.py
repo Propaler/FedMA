@@ -205,7 +205,7 @@ def local_retrain_dummy(local_datasets, weights, args, mode="bottom-up", freezin
         # [(9, 75), (9,), (19, 225), (19,), (475, 123), (123,), (123, 87), (87,), (87, 10), (10,)]
         if args.dataset in ("cifar10", "cinic10"):
             input_channel = 3
-        elif args.dataset == "mnist":
+        elif args.dataset == "mnist" or args.dataset == 'hpe-mnist':
             input_channel = 1
 
         num_filters = [weights[0].shape[0], weights[2].shape[0]]
@@ -436,7 +436,7 @@ def local_retrain(local_datasets, weights, args, mode="bottom-up", freezing_inde
         # [(9, 75), (9,), (19, 225), (19,), (475, 123), (123,), (123, 87), (87,), (87, 10), (10,)]
         if args.dataset in ("cifar10", "cinic10"):
             input_channel = 3
-        elif args.dataset == "mnist":
+        elif args.dataset == "mnist" or args.dataset == 'hpe-mnist':
             input_channel = 1
 
         num_filters = [weights[0].shape[0], weights[2].shape[0]]
@@ -741,7 +741,7 @@ def local_retrain_fedavg(local_datasets, weights, args, device="cpu"):
         # [(9, 75), (9,), (19, 225), (19,), (475, 123), (123,), (123, 87), (87,), (87, 10), (10,)]
         if args.dataset in ("cifar10", "cinic10"):
             input_channel = 3
-        elif args.dataset == "mnist":
+        elif args.dataset == "mnist" or args.dataset == 'hpe-mnist':
             input_channel = 1
 
         num_filters = [weights[0].shape[0], weights[2].shape[0]]
@@ -850,7 +850,7 @@ def local_retrain_fedprox(local_datasets, weights, mu, args, device="cpu"):
         # [(9, 75), (9,), (19, 225), (19,), (475, 123), (123,), (123, 87), (87,), (87, 10), (10,)]
         if args.dataset in ("cifar10", "cinic10"):
             input_channel = 3
-        elif args.dataset == "mnist":
+        elif args.dataset == "mnist" or args.dataset == "hpe-mnist":
             input_channel = 1
 
         num_filters = [weights[0].shape[0], weights[2].shape[0]]
@@ -966,7 +966,7 @@ def reconstruct_local_net(weights, args, ori_assignments=None, worker_index=0):
         # [(9, 75), (9,), (19, 225), (19,), (475, 123), (123,), (123, 87), (87,), (87, 10), (10,)]
         if args.dataset in ("cifar10", "cinic10"):
             input_channel = 3
-        elif args.dataset == "mnist":
+        elif args.dataset == "mnist" or args.dataset == 'hpe-mnist':
             input_channel = 1
 
         num_filters = [weights[0].shape[0], weights[2].shape[0]]
@@ -1418,7 +1418,7 @@ def fedavg_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
                             args=args)
         batch_weights = [copy.deepcopy(averaged_weights) for _ in range(args.n_nets)]
         del averaged_weights
-        save_model(cnn_averaged,'final_avg_model')
+        save_model(cnn_averaged,'final_avg_model_round_' + str(cr))
 
 def fedprox_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
                             averaging_weights, args,
@@ -1462,7 +1462,7 @@ def fedprox_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
                             args=args)
         batch_weights = [copy.deepcopy(averaged_weights) for _ in range(args.n_nets)]
         del averaged_weights
-        save_model(cnn_averaged,'final_avg_prox_model')
+        save_model(cnn_averaged,'final_avg_prox_model_round_' + str(cr))
 
 
 def fedma_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map, 
@@ -1587,7 +1587,7 @@ if __name__ == "__main__":
                                    args=args)
 
     # this is for PFNM
-    hungarian_weights, assignments_list = BBP_MAP(nets_list, model_meta_data, layer_type, net_dataidx_map, averaging_weights, args, device=device)
+    #hungarian_weights, assignments_list = BBP_MAP(nets_list, model_meta_data, layer_type, net_dataidx_map, averaging_weights, args, device=device)
 
     ## averaging models 
     ## we need to switch to real FedAvg implementation 
@@ -1610,6 +1610,7 @@ if __name__ == "__main__":
 
 
     models = nets_list
+    '''
     _ = compute_full_cnn_accuracy(models,
                                hungarian_weights,
                                train_dl_global,
@@ -1617,7 +1618,7 @@ if __name__ == "__main__":
                                n_classes,
                                device=device,
                                args=args)
-
+    '''
     _ = compute_model_averaging_accuracy(models, 
                                 averaged_weights, 
                                 train_dl_global, 
@@ -1666,3 +1667,4 @@ if __name__ == "__main__":
                                  assignments_list,
                                  comm_round=args.comm_round,
                                  device=device)
+
