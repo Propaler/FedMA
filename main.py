@@ -2,7 +2,7 @@ from utils import *
 import pickle
 import copy
 from sklearn.preprocessing import normalize
-
+import csv
 from matching.pfnm import layer_wise_group_descent
 from matching.pfnm import block_patching, patch_weights
 
@@ -1376,6 +1376,21 @@ def BBP_MAP(nets_list, model_meta_data, layer_type, net_dataidx_map,
     matched_weights.append(avg_last_layer_weight[-1, :])
     return matched_weights, assignments_list
 
+def dict_to_csv(name_file, dict_list):
+
+    path = './logs'
+    output_path = os.path.join(path, name_file)
+    head_csv=["round","accuracy"]
+    
+    try:
+        with open(output_path,"w") as name_file:
+            writer = csv.DictWriter(name_file, fieldnames=head_csv)
+            writer.writeheader()
+           
+            for data in dict_list:
+                writer.writerow(data)
+    except IOError:
+        print("I/O Error")
 
 def fedavg_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
                             averaging_weights, args,
@@ -1386,6 +1401,7 @@ def fedavg_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
 
     logging.info("=="*15)
     logging.info("Weights shapes: {}".format([bw.shape for bw in batch_weights[0]]))
+    csv_accuracy = {}
 
     for cr in range(comm_round):
         retrained_nets = []
@@ -1396,8 +1412,12 @@ def fedavg_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
             
             # def local_retrain_fedavg(local_datasets, weights, args, device="cpu"):
             retrained_cnn = local_retrain_fedavg((train_dl_local,test_dl_local), batch_weights[worker_index], args, device=device)
-            
+            if worker_index not in csv_accuracy.keys():
+                csv_accuracy[worker_index] = []
+            csv_accuracy[worker_index].append({"round":cr,"accuracy":compute_accuracy(retrained_cnn,test_dl_local,get_confusion_matrix=True,device=device)})
+
             retrained_nets.append(retrained_cnn)
+            
         batch_weights = pdm_prepare_full_weights_cnn(retrained_nets, device=device)
 
         total_data_points = sum([len(net_dataidx_map[r]) for r in range(args.n_nets)])
@@ -1416,9 +1436,18 @@ def fedavg_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
                             n_classes,
                             device=device,
                             args=args)
+        if (worker_index +1) not in csv_accuracy.keys():
+            csv_accuracy[worker_index + 1] = []
+        
+        csv_accuracy[worker_index + 1].append({"round":cr,"accuracy":compute_accuracy(cnn_averaged,test_dl_global,get_confusion_matrix=True,device=device)})
+        torch.save(cnn_averaged.state_dict(),f"models/model_fedavg_at_round_{cr}")
         batch_weights = [copy.deepcopy(averaged_weights) for _ in range(args.n_nets)]
         del averaged_weights
-        save_model(cnn_averaged,'final_avg_model_round_' + str(cr))
+        
+    for worker_index in range(args.n_nets +1):
+        dict_to_csv(f"fedavg_per_round{worker_index}.csv",csv_accuracy[worker_index])
+
+    torch.save(cnn_averaged.state_dict(),f"models/final_model_fedavg")
 
 def fedprox_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
                             averaging_weights, args,
@@ -1442,6 +1471,7 @@ def fedprox_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
             retrained_cnn = local_retrain_fedprox((train_dl_local,test_dl_local), batch_weights[worker_index], mu=args.mu, args=args, device=device)
             
             retrained_nets.append(retrained_cnn)
+            torch.save(retrained_cnn.state_dict(),f"models/model_{worker_index}_round_{cr}")
         batch_weights = pdm_prepare_full_weights_cnn(retrained_nets, device=device)
 
         total_data_points = sum([len(net_dataidx_map[r]) for r in range(args.n_nets)])
@@ -1462,7 +1492,7 @@ def fedprox_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
                             args=args)
         batch_weights = [copy.deepcopy(averaged_weights) for _ in range(args.n_nets)]
         del averaged_weights
-        save_model(cnn_averaged,'final_avg_prox_model_round_' + str(cr))
+        torch.save(cnn_averaged.state_dict(),f"models/model_round_{cr}")
 
 
 def fedma_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map, 

@@ -1065,7 +1065,7 @@ def init_models(net_configs, n_nets, args):
 
 def save_model(model, model_index):
     logger.info("saving local model-{}".format(model_index))
-    with open("trained_local_model"+str(model_index), "wb") as f_:
+    with open("models/trained_local_model"+str(model_index), "wb") as f_:
         torch.save(model.state_dict(), f_)
     return
 
