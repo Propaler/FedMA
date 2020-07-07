@@ -175,9 +175,10 @@ def partition_data(dataset, datadir, logdir, partition, n_nets, alpha, args):
             
             len_data_idx = len(data_from_csv[idx][0])
             net_dataidx_map[idx] = np.arange(init_position, len_data_idx + init_position)
-            init_position = len_data_idx + 1
+            init_position = len_data_idx + init_position
 
 
+        
         all_train_dataset = torch.utils.data.ConcatDataset([dataset[0] for dataset in data_from_csv.values()])
         all_test_dataset = torch.utils.data.ConcatDataset([dataset[1] for dataset in data_from_csv.values()])
 
@@ -187,7 +188,7 @@ def partition_data(dataset, datadir, logdir, partition, n_nets, alpha, args):
         y_train = np.array(y_train)
 
         traindata_cls_counts = record_net_data_stats(y_train, net_dataidx_map, logdir)
-
+        
         return y_train, net_dataidx_map, traindata_cls_counts
 
 
@@ -1046,7 +1047,7 @@ def init_models(net_configs, n_nets, args):
         elif args.model == "simple-cnn":
             if args.dataset in ("cifar10", "cinic10"):
                 cnn = SimpleCNN(input_dim=(16 * 5 * 5), hidden_dims=[120, 84], output_dim=10)
-            elif args.dataset == "mnist":
+            elif args.dataset == "mnist" or args.dataset == 'hpe-mnist':
                 cnn = SimpleCNNMNIST(input_dim=(16 * 4 * 4), hidden_dims=[120, 84], output_dim=10)
         elif args.model == "moderate-cnn":
             if args.dataset == "mnist" or args.dataset == "hpe-mnist":
@@ -1065,7 +1066,7 @@ def init_models(net_configs, n_nets, args):
 
 def save_model(model, model_index):
     logger.info("saving local model-{}".format(model_index))
-    with open("trained_local_model"+str(model_index), "wb") as f_:
+    with open("models/trained_local_model"+str(model_index), "wb") as f_:
         torch.save(model.state_dict(), f_)
     return
 
@@ -1107,7 +1108,7 @@ def load_model_viz(model, model_index, device="cpu"):
 
 def get_dataloader(dataset, datadir, train_bs, test_bs, dataidxs=None, args = None):
 
-    if dataset == 'hpe-mnist':
+    if dataset == 'hpe-mnist' and dataidxs is None:
         # shuffle false
         data_from_csv = {}
         csv_path = args.csv_path
@@ -1134,6 +1135,34 @@ def get_dataloader(dataset, datadir, train_bs, test_bs, dataidxs=None, args = No
             
         return train_dl, test_dl
 
+    if dataset == 'hpe-mnist' and dataidxs is not None:
+        # shuffle false
+        data_from_csv = {}
+        csv_path = args.csv_path
+        images_path = args.img_path
+
+        init_position = 0
+        for idx in range(args.n_nets):
+            data_from_csv[idx] = build_both_train_test_from_csv(
+                "mnist",
+                csv_path + "worker_" + str(idx +1)  + "/train.csv",
+                csv_path + "worker_"  + str(idx + 1)  + "/test.csv",
+                images_path,
+                img_dim=args.img_dim
+            )
+            
+            len_data_idx = len(data_from_csv[idx][0])
+
+        all_train_dataset = torch.utils.data.ConcatDataset([dataset[0] for dataset in data_from_csv.values()])
+        all_test_dataset = torch.utils.data.ConcatDataset([dataset[1] for dataset in data_from_csv.values()])
+
+        just_batch_train = torch.utils.data.Subset(all_train_dataset, dataidxs)
+
+        train_dl = data.DataLoader(dataset=just_batch_train, batch_size=train_bs, shuffle=False)
+        test_dl = data.DataLoader(dataset=all_test_dataset, batch_size=test_bs, shuffle=False)
+            
+        return train_dl, test_dl
+        
     if dataset in ('mnist', 'cifar10'):
         if dataset == 'mnist':
             dl_obj = MNIST_truncated
