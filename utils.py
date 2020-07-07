@@ -141,7 +141,7 @@ def partition_data(dataset, datadir, logdir, partition, n_nets, alpha, args):
             
             len_data_idx = len(data_from_csv[idx][0])
             net_dataidx_map[idx] = np.arange(init_position, len_data_idx + init_position)
-            init_position = len_data_idx + 1
+            init_position = len_data_idx + init_position
 
 
         all_train_dataset = torch.utils.data.ConcatDataset([dataset[0] for dataset in data_from_csv.values()])
@@ -1108,7 +1108,7 @@ def load_model_viz(model, model_index, device="cpu"):
 
 def get_dataloader(dataset, datadir, train_bs, test_bs, dataidxs=None, args = None):
 
-    if dataset == 'hpe-mnist' and dataidxs is None:
+    if dataset == 'hpe-mnist':
         # shuffle false
         data_from_csv = {}
         csv_path = args.csv_path
@@ -1128,41 +1128,50 @@ def get_dataloader(dataset, datadir, train_bs, test_bs, dataidxs=None, args = No
 
         all_train_dataset = torch.utils.data.ConcatDataset([dataset[0] for dataset in data_from_csv.values()])
         all_test_dataset = torch.utils.data.ConcatDataset([dataset[1] for dataset in data_from_csv.values()])
-
-
-        train_dl = data.DataLoader(dataset=all_train_dataset, batch_size=train_bs, shuffle=False)
-        test_dl = data.DataLoader(dataset=all_test_dataset, batch_size=test_bs, shuffle=False)
-            
-        return train_dl, test_dl
-
-    if dataset == 'hpe-mnist' and dataidxs is not None:
-        # shuffle false
-        data_from_csv = {}
-        csv_path = args.csv_path
-        images_path = args.img_path
-
-        init_position = 0
-        for idx in range(args.n_nets):
-            data_from_csv[idx] = build_both_train_test_from_csv(
-                "mnist",
-                csv_path + "worker_" + str(idx +1)  + "/train.csv",
-                csv_path + "worker_"  + str(idx + 1)  + "/test.csv",
-                images_path,
-                img_dim=args.img_dim
-            )
-            
-            len_data_idx = len(data_from_csv[idx][0])
-
-        all_train_dataset = torch.utils.data.ConcatDataset([dataset[0] for dataset in data_from_csv.values()])
-        all_test_dataset = torch.utils.data.ConcatDataset([dataset[1] for dataset in data_from_csv.values()])
-
-        just_batch_train = torch.utils.data.Subset(all_train_dataset, dataidxs)
-
-        train_dl = data.DataLoader(dataset=just_batch_train, batch_size=train_bs, shuffle=False)
-        test_dl = data.DataLoader(dataset=all_test_dataset, batch_size=test_bs, shuffle=False)
-            
-        return train_dl, test_dl
         
+        if dataidxs is not None:
+            just_batch_train = torch.utils.data.Subset(all_train_dataset, dataidxs)
+
+            train_dl = data.DataLoader(dataset=just_batch_train, batch_size=train_bs, shuffle=False)
+        else:
+            train_dl = train_dl = data.DataLoader(dataset=all_train_dataset, batch_size=train_bs, shuffle=False)
+        
+        test_dl = data.DataLoader(dataset=all_test_dataset, batch_size=test_bs, shuffle=False)
+            
+        return train_dl, test_dl
+
+    if dataset == 'nih':
+        # shuffle false
+        data_from_csv = {}
+        csv_path = args.csv_path
+        images_path = args.img_path
+
+        init_position = 0
+        for idx in range(args.n_nets):
+            data_from_csv[idx] = build_both_train_test_from_csv(
+                "nih",
+                csv_path + "worker_" + str(idx +1)  + "/train.csv",
+                csv_path + "worker_"  + str(idx + 1)  + "/test.csv",
+                images_path,
+                img_dim=args.img_dim
+            )
+            
+            len_data_idx = len(data_from_csv[idx][0])
+
+        all_train_dataset = torch.utils.data.ConcatDataset([dataset[0] for dataset in data_from_csv.values()])
+        all_test_dataset = torch.utils.data.ConcatDataset([dataset[1] for dataset in data_from_csv.values()])
+        
+        if dataidxs is not None:
+            just_batch_train = torch.utils.data.Subset(all_train_dataset, dataidxs)
+
+            train_dl = data.DataLoader(dataset=just_batch_train, batch_size=train_bs, shuffle=False)
+        else:
+            train_dl = train_dl = data.DataLoader(dataset=all_train_dataset, batch_size=train_bs, shuffle=False)
+        
+        test_dl = data.DataLoader(dataset=all_test_dataset, batch_size=test_bs, shuffle=False)
+            
+        return train_dl, test_dl
+
     if dataset in ('mnist', 'cifar10'):
         if dataset == 'mnist':
             dl_obj = MNIST_truncated
