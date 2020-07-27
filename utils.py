@@ -190,7 +190,7 @@ def partition_data(dataset, datadir, logdir, partition, n_nets, alpha, args):
         y_train = np.array(y_train)
 
         traindata_cls_counts = record_net_data_stats(y_train, net_dataidx_map, logdir)
-
+        
         return y_train, net_dataidx_map, traindata_cls_counts
 
     if dataset == 'hpe-cifar10':
@@ -1208,6 +1208,7 @@ def get_dataloader(dataset, datadir, train_bs, test_bs, dataidxs=None, args = No
         else:
             train_dl = train_dl = data.DataLoader(dataset=all_train_dataset, batch_size=train_bs, shuffle=False)
         
+
         #test_dl = data.DataLoader(dataset=all_test_dataset, batch_size=test_bs, shuffle=False)
         
         dl_obj = MNIST_truncated
