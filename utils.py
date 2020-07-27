@@ -32,6 +32,7 @@ from model import *
 from hpe import dataset
 from hpe.mnist import DataLoaderMNIST
 from hpe.nih import DataLoaderNIH
+from hpe.cifar10 import DataLoaderCifar10
 
 logging.basicConfig()
 logger = logging.getLogger()
@@ -40,6 +41,7 @@ logger.setLevel(logging.INFO)
 datasets = {
     "mnist": DataLoaderMNIST,
     "nih": DataLoaderNIH,
+    "cifar10":DataLoaderCifar10
 }
 
 def mkdirs(dirpath):
@@ -191,9 +193,40 @@ def partition_data(dataset, datadir, logdir, partition, n_nets, alpha, args):
         
         return y_train, net_dataidx_map, traindata_cls_counts
 
+    if dataset == 'hpe-cifar10':
+            # testing
+        data_from_csv = {}
+        net_dataidx_map = {}
+        csv_path = args.csv_path
+        images_path = args.img_path
 
-    if dataset == 'nih':
-        raise NotImplementedError
+        init_position = 0
+        for idx in range(n_nets):
+            data_from_csv[idx] = build_both_train_test_from_csv(
+                "cifar10",
+                csv_path + "worker_" + str(idx +1)  + "/train.csv",
+                csv_path + "worker_"  + str(idx + 1)  + "/test.csv",
+                images_path,
+                img_dim=args.img_dim
+            )
+
+            len_data_idx = len(data_from_csv[idx][0])
+            net_dataidx_map[idx] = np.arange(init_position, len_data_idx + init_position)
+            init_position = len_data_idx + init_position
+
+
+        all_train_dataset = torch.utils.data.ConcatDataset([dataset[0] for dataset in data_from_csv.values()])
+        all_test_dataset = torch.utils.data.ConcatDataset([dataset[1] for dataset in data_from_csv.values()])
+
+        dataloader = torch.utils.data.DataLoader(all_train_dataset, shuffle=False)
+        iter_dataloader = iter(dataloader)
+        y_train = [target for (data, target) in iter_dataloader]
+        y_train = np.array(y_train)
+
+        traindata_cls_counts = record_net_data_stats(y_train, net_dataidx_map, logdir)
+
+        return y_train, net_dataidx_map, traindata_cls_counts
+
 
     elif dataset == 'cifar10':
         X_train, y_train, X_test, y_test = load_cifar10_data(datadir)
@@ -1045,14 +1078,14 @@ def init_models(net_configs, n_nets, args):
         elif args.model == "vgg":
             cnn = vgg11()
         elif args.model == "simple-cnn":
-            if args.dataset in ("cifar10", "cinic10"):
+            if args.dataset in ("cifar10", "cinic10","hpe-cifar10"):
                 cnn = SimpleCNN(input_dim=(16 * 5 * 5), hidden_dims=[120, 84], output_dim=10)
             elif args.dataset == "mnist" or args.dataset == 'hpe-mnist':
                 cnn = SimpleCNNMNIST(input_dim=(16 * 4 * 4), hidden_dims=[120, 84], output_dim=10)
         elif args.model == "moderate-cnn":
             if args.dataset == "mnist" or args.dataset == "hpe-mnist":
                 cnn = ModerateCNNMNIST()
-            elif args.dataset in ("cifar10", "cinic10"):
+            elif args.dataset in ("cifar10", "cinic10","hpe-cifar10"):
                 cnn = ModerateCNN()
 
         cnns[cnn_i] = cnn
@@ -1107,6 +1140,45 @@ def load_model_viz(model, model_index, device="cpu"):
 
 
 def get_dataloader(dataset, datadir, train_bs, test_bs, dataidxs=None, args = None):
+    if dataset == 'hpe-cifar10':
+        # shuffle false
+        data_from_csv = {}
+        csv_path = args.csv_path
+        images_path = args.img_path
+
+        init_position = 0
+        for idx in range(args.n_nets):
+            data_from_csv[idx] = build_both_train_test_from_csv(
+                "cifar10",
+                csv_path + "worker_" + str(idx +1)  + "/train.csv",
+                csv_path + "worker_"  + str(idx + 1)  + "/test.csv",
+                images_path,
+                img_dim=args.img_dim
+            )
+            
+            len_data_idx = len(data_from_csv[idx][0])
+
+        all_train_dataset = torch.utils.data.ConcatDataset([dataset[0] for dataset in data_from_csv.values()])
+        all_test_dataset = torch.utils.data.ConcatDataset([dataset[1] for dataset in data_from_csv.values()])
+        
+        if dataidxs is not None:
+            just_batch_train = torch.utils.data.Subset(all_train_dataset, dataidxs)
+
+            train_dl = data.DataLoader(dataset=just_batch_train, batch_size=train_bs, shuffle=False)
+        else:
+            train_dl = train_dl = data.DataLoader(dataset=all_train_dataset, batch_size=train_bs, shuffle=False)
+        
+        #test_dl = data.DataLoader(dataset=all_test_dataset, batch_size=test_bs, shuffle=False)
+        
+        dl_obj = CIFAR10_truncated
+          
+        normalize = transforms.Normalize(mean=[x/255.0 for x in [125.3, 123.0, 113.9]],std=[x/255.0 for x in [63.0, 62.1, 66.7]])
+        transform_test = transforms.Compose([transforms.ToTensor(),normalize])
+        test_ds = dl_obj(datadir, train=False, transform=transform_test, download=True)
+
+        test_dl = data.DataLoader(dataset=test_ds, batch_size=test_bs, shuffle=False)
+        
+        return train_dl, test_dl
 
     if dataset == 'hpe-mnist':
         # shuffle false
@@ -1136,8 +1208,19 @@ def get_dataloader(dataset, datadir, train_bs, test_bs, dataidxs=None, args = No
         else:
             train_dl = train_dl = data.DataLoader(dataset=all_train_dataset, batch_size=train_bs, shuffle=False)
         
-        test_dl = data.DataLoader(dataset=all_test_dataset, batch_size=test_bs, shuffle=False)
-            
+
+        #test_dl = data.DataLoader(dataset=all_test_dataset, batch_size=test_bs, shuffle=False)
+        
+        dl_obj = MNIST_truncated
+        
+        transform_test = transforms.Compose([
+                        transforms.ToTensor(),
+                        transforms.Normalize((0.1307,), (0.3081,))])  
+        
+        test_ds = dl_obj(datadir, train=False, transform=transform_test, download=True)
+
+        test_dl = data.DataLoader(dataset=test_ds, batch_size=test_bs, shuffle=False)
+        
         return train_dl, test_dl
 
     if dataset == 'nih':
@@ -1468,3 +1551,4 @@ class ModerateCNNContainerConvBlocks(nn.Module):
     def forward(self, x):
         x = self.conv_layer(x)
         return x
+

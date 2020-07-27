@@ -12,12 +12,12 @@ def compute_model_averaging_accuracy(models, weights, train_dl, test_dl, n_class
     elif args.model == "vgg":
         avg_cnn = vgg11()
     elif args.model == "simple-cnn":
-        if args.dataset in ("cifar10", "cinic10"):
+        if args.dataset in ("cifar10", "cinic10","hpe-cifar10"):
             avg_cnn = SimpleCNN(input_dim=(16 * 5 * 5), hidden_dims=[120, 84], output_dim=10)
         elif args.dataset == "mnist" or args.dataset == 'hpe-mnist':
             avg_cnn = SimpleCNNMNIST(input_dim=(16 * 4 * 4), hidden_dims=[120, 84], output_dim=10)
     elif args.model == "moderate-cnn":
-        if args.dataset in ("cifar10", "cinic10"):
+        if args.dataset in ("cifar10", "cinic10","hpe-cifar10"):
             avg_cnn = ModerateCNN()
         elif args.dataset == "mnist" or args.dataset == 'hpe-mnist':
             avg_cnn = ModerateCNNMNIST()
@@ -230,7 +230,7 @@ def compute_full_cnn_accuracy(models, weights, train_dl, test_dl, n_classes, dev
     elif args.model == "simple-cnn":
         # input_channel, num_filters, kernel_size, input_dim, hidden_dims, output_dim=10):
         # [(9, 75), (9,), (19, 225), (19,), (475, 123), (123,), (123, 87), (87,), (87, 10), (10,)]
-        if args.dataset in ("cifar10", "cinic10"):
+        if args.dataset in ("cifar10", "cinic10","hpe-cifar10"):
             input_channel = 3
         elif args.dataset == "mnist" or args.dataset == 'hpe-mnist':
             input_channel = 1
@@ -250,7 +250,7 @@ def compute_full_cnn_accuracy(models, weights, train_dl, test_dl, n_classes, dev
         num_filters = [weights[0].shape[0], weights[2].shape[0], weights[4].shape[0], weights[6].shape[0], weights[8].shape[0], weights[10].shape[0]]
         input_dim = weights[12].shape[0]
         hidden_dims = [weights[12].shape[1], weights[14].shape[1]]
-        if args.dataset in ("cifar10", "cinic10"):
+        if args.dataset in ("cifar10", "cinic10","hpe-cifar10"):
             matched_cnn = ModerateCNNContainer(3,
                                                 num_filters, 
                                                 kernel_size=3, 
