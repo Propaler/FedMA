@@ -45,7 +45,7 @@ def add_fit_args(parser):
                         help='neural network used in training')
     parser.add_argument('--csv_path',type=str, default=None)
     parser.add_argument('--img_path',type=str,default=None)
-    parser.add_argument('--img_dim',type=int, default=28, help='image dimension for the dataset')
+    parser.add_argument('--img_dim',type=int, default=32, help='image dimension for the dataset')
     parser.add_argument('--mu',type=float, default=0, help='mu value to fedprox experiment')
     parser.add_argument('--dataset', type=str, default='cifar10', metavar='N',
                         help='dataset used for training')
@@ -203,7 +203,7 @@ def local_retrain_dummy(local_datasets, weights, args, mode="bottom-up", freezin
     elif args.model == "simple-cnn":
         # input_channel, num_filters, kernel_size, input_dim, hidden_dims, output_dim=10):
         # [(9, 75), (9,), (19, 225), (19,), (475, 123), (123,), (123, 87), (87,), (87, 10), (10,)]
-        if args.dataset in ("cifar10", "cinic10"):
+        if args.dataset in ("cifar10", "cinic10","hpe-cifar10"):
             input_channel = 3
         elif args.dataset == "mnist" or args.dataset == 'hpe-mnist':
             input_channel = 1
@@ -277,7 +277,7 @@ def local_retrain_dummy(local_datasets, weights, args, mode="bottom-up", freezin
             pass
 
 
-        if args.dataset in ("cifar10", "cinic10"):
+        if args.dataset in ("cifar10", "cinic10","hpe-cifar10"):
             if mode == "squeezing":
                 matched_cnn = ModerateCNN()
             else:
@@ -434,7 +434,7 @@ def local_retrain(local_datasets, weights, args, mode="bottom-up", freezing_inde
     elif args.model == "simple-cnn":
         # input_channel, num_filters, kernel_size, input_dim, hidden_dims, output_dim=10):
         # [(9, 75), (9,), (19, 225), (19,), (475, 123), (123,), (123, 87), (87,), (87, 10), (10,)]
-        if args.dataset in ("cifar10", "cinic10"):
+        if args.dataset in ("cifar10", "cinic10","hpe-cifar10"):
             input_channel = 3
         elif args.dataset == "mnist" or args.dataset == 'hpe-mnist':
             input_channel = 1
@@ -508,7 +508,7 @@ def local_retrain(local_datasets, weights, args, mode="bottom-up", freezing_inde
             pass
 
 
-        if args.dataset in ("cifar10", "cinic10"):
+        if args.dataset in ("cifar10", "cinic10","hpe-cifar10"):
             if mode == "squeezing":
                 matched_cnn = ModerateCNN()
             else:
@@ -739,7 +739,7 @@ def local_retrain_fedavg(local_datasets, weights, args, device="cpu"):
     elif args.model == "simple-cnn":
         # input_channel, num_filters, kernel_size, input_dim, hidden_dims, output_dim=10):
         # [(9, 75), (9,), (19, 225), (19,), (475, 123), (123,), (123, 87), (87,), (87, 10), (10,)]
-        if args.dataset in ("cifar10", "cinic10"):
+        if args.dataset in ("cifar10", "cinic10","hpe-cifar10"):
             input_channel = 3
         elif args.dataset == "mnist" or args.dataset == 'hpe-mnist':
             input_channel = 1
@@ -848,7 +848,7 @@ def local_retrain_fedprox(local_datasets, weights, mu, args, device="cpu"):
     elif args.model == "simple-cnn":
         # input_channel, num_filters, kernel_size, input_dim, hidden_dims, output_dim=10):
         # [(9, 75), (9,), (19, 225), (19,), (475, 123), (123,), (123, 87), (87,), (87, 10), (10,)]
-        if args.dataset in ("cifar10", "cinic10"):
+        if args.dataset in ("cifar10", "cinic10","hpe-cifar10"):
             input_channel = 3
         elif args.dataset == "mnist" or args.dataset == "hpe-mnist":
             input_channel = 1
@@ -964,7 +964,7 @@ def reconstruct_local_net(weights, args, ori_assignments=None, worker_index=0):
     elif args.model == "simple-cnn":
         # input_channel, num_filters, kernel_size, input_dim, hidden_dims, output_dim=10):
         # [(9, 75), (9,), (19, 225), (19,), (475, 123), (123,), (123, 87), (87,), (87, 10), (10,)]
-        if args.dataset in ("cifar10", "cinic10"):
+        if args.dataset in ("cifar10", "cinic10","hpe-cifar10"):
             input_channel = 3
         elif args.dataset == "mnist" or args.dataset == 'hpe-mnist':
             input_channel = 1
@@ -1414,11 +1414,11 @@ def fedavg_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
             retrained_cnn = local_retrain_fedavg((train_dl_local,test_dl_local), batch_weights[worker_index], args, device=device)
             if worker_index not in csv_accuracy.keys():
                 csv_accuracy[worker_index] = []
-            csv_accuracy[worker_index].append({"round":cr,"accuracy":compute_accuracy(retrained_cnn,test_dl_local,get_confusion_matrix=True,device=device)})
+            csv_accuracy[worker_index].append({"round":cr,"accuracy":compute_accuracy(retrained_cnn,test_dl_local,get_confusion_matrix=False,device=device)})
 
             retrained_nets.append(retrained_cnn)
-            
-        batch_weights = pdm_prepare_full_weights_cnn(retrained_nets, device=device)
+            torch.save(retrained_cnn.state_dict(),f"models/model_{worker_index}_{args.dataset}")
+        #batch_weights = pdm_prepare_full_weights_cnn(retrained_nets, device=device)
 
         total_data_points = sum([len(net_dataidx_map[r]) for r in range(args.n_nets)])
         fed_avg_freqs = [len(net_dataidx_map[r]) / total_data_points for r in range(args.n_nets)]
@@ -1439,15 +1439,15 @@ def fedavg_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
         if (worker_index +1) not in csv_accuracy.keys():
             csv_accuracy[worker_index + 1] = []
         
-        csv_accuracy[worker_index + 1].append({"round":cr,"accuracy":compute_accuracy(cnn_averaged,test_dl_global,get_confusion_matrix=True,device=device)})
-        torch.save(cnn_averaged.state_dict(),f"models/model_fedavg_at_round_{cr}")
-        batch_weights = [copy.deepcopy(averaged_weights) for _ in range(args.n_nets)]
+        csv_accuracy[worker_index + 1].append({"round":cr,"accuracy":compute_accuracy(cnn_averaged,test_dl_global,get_confusion_matrix=False,device=device)})
+        torch.save(cnn_averaged.state_dict(),f"models/model_{args.comm_type}_at_round_{cr}_{args.dataset}")
+        #batch_weights = [copy.deepcopy(averaged_weights) for _ in range(args.n_nets)]
         del averaged_weights
         
     for worker_index in range(args.n_nets +1):
-        dict_to_csv(f"fedavg_per_round{worker_index}.csv",csv_accuracy[worker_index])
+        dict_to_csv(f"{args.comm_type}_per_round{worker_index}_{args.dataset}.csv",csv_accuracy[worker_index])
 
-    torch.save(cnn_averaged.state_dict(),f"models/final_model_fedavg")
+    torch.save(cnn_averaged.state_dict(),f"models/final_model_{args.comm_type}_{args.dataset}")
 
 def fedprox_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
                             averaging_weights, args,
@@ -1472,7 +1472,7 @@ def fedprox_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
             
             retrained_nets.append(retrained_cnn)
             torch.save(retrained_cnn.state_dict(),f"models/model_{worker_index}_round_{cr}")
-        batch_weights = pdm_prepare_full_weights_cnn(retrained_nets, device=device)
+        #batch_weights = pdm_prepare_full_weights_cnn(retrained_nets, device=device)
 
         total_data_points = sum([len(net_dataidx_map[r]) for r in range(args.n_nets)])
         fed_avg_freqs = [len(net_dataidx_map[r]) / total_data_points for r in range(args.n_nets)]
@@ -1490,7 +1490,7 @@ def fedprox_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
                             n_classes,
                             device=device,
                             args=args)
-        batch_weights = [copy.deepcopy(averaged_weights) for _ in range(args.n_nets)]
+        #batch_weights = [copy.deepcopy(averaged_weights) for _ in range(args.n_nets)]
         del averaged_weights
         torch.save(cnn_averaged.state_dict(),f"models/model_round_{cr}")
 
@@ -1520,35 +1520,45 @@ def fedma_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
     n_classes = 10
     batch_freqs = pdm_prepare_freq(cls_freqs, n_classes)
     it=5
-
+    csv_accuracy = {}
     for cr in range(comm_round):
         logger.info("Entering communication round: {} ...".format(cr))
         retrained_nets = []
         for worker_index in range(args.n_nets):
             dataidxs = net_dataidx_map[worker_index]
             train_dl_local, test_dl_local = get_dataloader(args.dataset, args_datadir, args.batch_size, 32, dataidxs, args=args)
-
+            if worker_index not in csv_accuracy.keys():
+                csv_accuracy[worker_index] = []
             # for the "squeezing" mode, we pass assignment list wrt this worker to the `local_retrain` function
             recons_local_net = reconstruct_local_net(batch_weights[worker_index], args, ori_assignments=assignments_list, worker_index=worker_index)
             retrained_cnn = local_retrain((train_dl_local,test_dl_local), recons_local_net, args,
                                             mode="bottom-up", freezing_index=0, ori_assignments=None, device=device)
+            csv_accuracy[worker_index].append({"round":cr,"accuracy":compute_accuracy(retrained_cnn,test_dl_local,get_confusion_matrix=True,device=device)})
             retrained_nets.append(retrained_cnn)
 
         # BBP_MAP step
         hungarian_weights, assignments_list = BBP_MAP(retrained_nets, model_meta_data, layer_type, net_dataidx_map, averaging_weights, args, device=device)
 
         logger.info("After retraining and rematching for comm. round: {}, we measure the accuracy ...".format(cr))
-        _ = compute_full_cnn_accuracy(models,
+        cnn_averaged = compute_full_cnn_accuracy(models,
                                    hungarian_weights,
                                    train_dl_global,
                                    test_dl_global,
                                    n_classes,
                                    device=device,
                                    args=args)
+        if (worker_index + 1) not in csv_accuracy.keys():
+            csv_accuracy[worker_index + 1] = []
+        csv_accuracy[worker_index + 1].append({"round":cr,"accuracy":compute_accuracy(cnn_averaged,test_dl_global,get_confusion_matrix=True,device=device)})
+        torch.save(cnn_averaged.state_dict(),f"models/model_fedavg_at_round_{cr}")
         batch_weights = [copy.deepcopy(hungarian_weights) for _ in range(args.n_nets)]
         del hungarian_weights
         del retrained_nets
 
+    for worker_index in range(args.n_nets +1):
+        dict_to_csv(f"fedavg_per_round{worker_index}.csv",csv_accuracy[worker_index])
+
+    torch.save(cnn_averaged.state_dict(),f"models/final_model_fedavg")
 
 if __name__ == "__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
