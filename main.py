@@ -10,6 +10,8 @@ from matching.gaus_marginal_matching import match_local_atoms
 from combine_nets import compute_pdm_matching_multilayer, compute_iterative_pdm_matching
 from matching_performance import compute_model_averaging_accuracy, compute_pdm_cnn_accuracy, compute_pdm_vgg_accuracy, compute_full_cnn_accuracy
 
+import os
+
 logging.basicConfig()
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -1418,7 +1420,7 @@ def fedavg_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
 
             retrained_nets.append(retrained_cnn)
             torch.save(retrained_cnn.state_dict(),f"models/model_{worker_index}_{args.dataset}")
-        #batch_weights = pdm_prepare_full_weights_cnn(retrained_nets, device=device)
+        batch_weights = pdm_prepare_full_weights_cnn(retrained_nets, device=device)
 
         total_data_points = sum([len(net_dataidx_map[r]) for r in range(args.n_nets)])
         fed_avg_freqs = [len(net_dataidx_map[r]) / total_data_points for r in range(args.n_nets)]
@@ -1441,7 +1443,7 @@ def fedavg_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
         
         csv_accuracy[worker_index + 1].append({"round":cr,"accuracy":compute_accuracy(cnn_averaged,test_dl_global,get_confusion_matrix=False,device=device)})
         torch.save(cnn_averaged.state_dict(),f"models/model_{args.comm_type}_at_round_{cr}_{args.dataset}")
-        #batch_weights = [copy.deepcopy(averaged_weights) for _ in range(args.n_nets)]
+        batch_weights = [copy.deepcopy(averaged_weights) for _ in range(args.n_nets)]
         del averaged_weights
         
     for worker_index in range(args.n_nets +1):
@@ -1458,6 +1460,7 @@ def fedprox_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
 
     logging.info("=="*15)
     logging.info("Weights shapes: {}".format([bw.shape for bw in batch_weights[0]]))
+    csv_accuracy = {}
 
     for cr in range(comm_round):
         retrained_nets = []
@@ -1471,8 +1474,11 @@ def fedprox_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
             retrained_cnn = local_retrain_fedprox((train_dl_local,test_dl_local), batch_weights[worker_index], mu=args.mu, args=args, device=device)
             
             retrained_nets.append(retrained_cnn)
-            torch.save(retrained_cnn.state_dict(),f"models/model_{worker_index}_round_{cr}")
-        #batch_weights = pdm_prepare_full_weights_cnn(retrained_nets, device=device)
+            if worker_index not in csv_accuracy.keys():
+                csv_accuracy[worker_index] = []
+            csv_accuracy[worker_index].append({"round":cr,"accuracy":compute_accuracy(retrained_cnn,test_dl_local,get_confusion_matrix=False,device=device)})
+            
+        batch_weights = pdm_prepare_full_weights_cnn(retrained_nets, device=device)
 
         total_data_points = sum([len(net_dataidx_map[r]) for r in range(args.n_nets)])
         fed_avg_freqs = [len(net_dataidx_map[r]) / total_data_points for r in range(args.n_nets)]
@@ -1490,10 +1496,20 @@ def fedprox_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
                             n_classes,
                             device=device,
                             args=args)
-        #batch_weights = [copy.deepcopy(averaged_weights) for _ in range(args.n_nets)]
+        if (worker_index + 1) not in csv_accuracy.keys():
+            csv_accuracy[worker_index + 1] = []
+        
+        csv_accuracy[worker_index + 1].append({"round":cr,"accuracy":compute_accuracy(cnn_averaged,test_dl_global,get_confusion_matrix=False,device=device)})
+        torch.save(cnn_averaged.state_dict(),f"models/model_{args.comm_type}_at_round_{cr}_{args.dataset}")
+        batch_weights = [copy.deepcopy(averaged_weights) for _ in range(args.n_nets)]
         del averaged_weights
-        torch.save(cnn_averaged.state_dict(),f"models/model_round_{cr}")
+        
+    
+    
+    for worker_index in range(args.n_nets +1):
+        dict_to_csv(f"{args.comm_type}_per_round{worker_index}_{args.dataset}.csv",csv_accuracy[worker_index])
 
+    torch.save(cnn_averaged.state_dict(),f"models/final_model_{args.comm_type}_{args.dataset}")
 
 def fedma_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map, 
                             averaging_weights, args, 
@@ -1547,22 +1563,32 @@ def fedma_comm(batch_weights, model_meta_data, layer_type, net_dataidx_map,
                                    n_classes,
                                    device=device,
                                    args=args)
-        if (worker_index + 1) not in csv_accuracy.keys():
+        if (worker_index +1) not in csv_accuracy.keys():
             csv_accuracy[worker_index + 1] = []
-        csv_accuracy[worker_index + 1].append({"round":cr,"accuracy":compute_accuracy(cnn_averaged,test_dl_global,get_confusion_matrix=True,device=device)})
-        torch.save(cnn_averaged.state_dict(),f"models/model_fedavg_at_round_{cr}")
+        
+        csv_accuracy[worker_index + 1].append({"round":cr,"accuracy":compute_accuracy(cnn_averaged,test_dl_global,get_confusion_matrix=False,device=device)})
+        torch.save(cnn_averaged.state_dict(),f"models/model_{args.comm_type}_at_round_{cr}_{args.dataset}")
+
         batch_weights = [copy.deepcopy(hungarian_weights) for _ in range(args.n_nets)]
         del hungarian_weights
         del retrained_nets
 
     for worker_index in range(args.n_nets +1):
-        dict_to_csv(f"fedavg_per_round{worker_index}.csv",csv_accuracy[worker_index])
+        dict_to_csv(f"{args.comm_type}_per_round{worker_index}_{args.dataset}.csv",csv_accuracy[worker_index])
 
-    torch.save(cnn_averaged.state_dict(),f"models/final_model_fedavg")
+    torch.save(cnn_averaged.state_dict(),f"models/final_model_{args.comm_type}_{args.dataset}")
 
 if __name__ == "__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    
+    dir_logs = './logs'
+    dir_models = './models'
 
+    if not os.path.exists(dir_logs):
+        os.mkdir(dir_logs)
+    if not os.path.exists(dir_models):
+        os.mkdir(dir_models)
+        
     # Assuming that we are on a CUDA machine, this should print a CUDA device:
     logger.info(device)
     args = add_fit_args(argparse.ArgumentParser(description='Probabilistic Federated CNN Matching'))

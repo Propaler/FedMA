@@ -190,8 +190,7 @@ def partition_data(dataset, datadir, logdir, partition, n_nets, alpha, args):
         y_train = np.array(y_train)
 
         traindata_cls_counts = record_net_data_stats(y_train, net_dataidx_map, logdir)
-        print(traindata_cls_counts)
-        input()
+
         return y_train, net_dataidx_map, traindata_cls_counts
 
     if dataset == 'hpe-cifar10':
@@ -228,8 +227,6 @@ def partition_data(dataset, datadir, logdir, partition, n_nets, alpha, args):
 
         return y_train, net_dataidx_map, traindata_cls_counts
 
-    if dataset == 'nih':
-        raise NotImplementedError
 
     elif dataset == 'cifar10':
         X_train, y_train, X_test, y_test = load_cifar10_data(datadir)
