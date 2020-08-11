@@ -222,24 +222,41 @@ def partition_data(dataset, datadir, logdir, partition, n_nets, alpha, args):
 
     elif partition == "hetero-dir":
         min_size = 0
+        # num of classes
         K = 10
+        # num of images
         N = y_train.shape[0]
         net_dataidx_map = {}
 
         while min_size < 10:
+            # create idx for each client
             idx_batch = [[] for _ in range(n_nets)]
             # for each class in the dataset
             for k in range(K):
+                # get all indices for K class
                 idx_k = np.where(y_train == k)[0]
                 np.random.shuffle(idx_k)
+                
+                #get proportions for each client
                 proportions = np.random.dirichlet(np.repeat(alpha, n_nets))
                 ## Balance
                 proportions = np.array([p*(len(idx_j)<N/n_nets) for p,idx_j in zip(proportions,idx_batch)])
-                proportions = proportions/proportions.sum()
-                proportions = (np.cumsum(proportions)*len(idx_k)).astype(int)[:-1]
-                idx_batch = [idx_j + idx.tolist() for idx_j,idx in zip(idx_batch,np.split(idx_k,proportions))]
-                min_size = min([len(idx_j) for idx_j in idx_batch])
 
+                # divide each proportion for the sum of it all
+                proportions = proportions/proportions.sum()
+
+                # np.cumsum calculates the cumulative sum of the array
+                # calculates image proportion for each client excluding the last client
+                # the last client, given the cumsum, will always receive the entire images
+                proportions = (np.cumsum(proportions)*len(idx_k)).astype(int)[:-1]
+
+                # here, np.split divides the idx_k in n_nets parts
+                # then concat the existence/new idx_k with the splited idx_tolist()
+                idx_batch = [idx_j + idx.tolist() for idx_j,idx in zip(idx_batch,np.split(idx_k,proportions))]
+
+                #get the min num of images on total for each worker
+                min_size = min(len(idx_j) for idx_j in idx_batch)
+        
         for j in range(n_nets):
             np.random.shuffle(idx_batch[j])
             net_dataidx_map[j] = idx_batch[j]
